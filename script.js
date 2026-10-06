@@ -1,0 +1,336 @@
+// Select main DOM elements
+const form = document.getElementById('todo-form');
+const input = document.getElementById('todo-input');
+const list = document.getElementById('todo-list');
+const dateInput = document.getElementById('todo-date');
+const priorityInput = document.getElementById('todo-priority');
+
+const filters = document.getElementById('filters');
+const filterButtons = document.querySelectorAll('#filters button');
+const historyButton = document.getElementById('history-toggle');
+const chartsSection = document.getElementById('charts');
+
+const priorityChartCanvas = document.getElementById('priority-chart');
+const weeklyChartCanvas = document.getElementById('weekly-chart');
+const previousMonthButton = document.getElementById('previous-month');
+const nextMonthButton = document.getElementById('next-month');
+
+// Application State
+let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+let priorityChart = null;
+let weeklyChart = null;
+let chartMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let historyMode = false;
+let currentFilter = 'active';
+
+/**
+ * Persists current task list to browser localStorage.
+ */
+function saveTasks() {
+    localStorage.setItem('tasks', JSON.stringify(tasks));
+}
+
+/**
+ * Returns today's date formatted as YYYY-MM-DD.
+ */
+function getTodayDate() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+/**
+ * Checks if an active task is overdue.
+ */
+function isOverdue(task) {
+    return Boolean(task.dueDate && task.dueDate < getTodayDate() && !task.completed);
+}
+
+/**
+ * Updates UI active status for filter buttons.
+ */
+function updateActiveFilterUI(selectedFilter) {
+    filterButtons.forEach(btn => {
+        if (btn.dataset.filter === selectedFilter) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
+/**
+ * Renders task list based on active mode and filter.
+ */
+function showTasks(filter = historyMode ? currentFilter : 'active') {
+    currentFilter = filter;
+    updateActiveFilterUI(filter);
+    list.innerHTML = '';
+
+    const visibleTasks = tasks.filter(function(task) {
+        if (filter === 'active') return !task.completed;
+        if (filter === 'overdue-task') return isOverdue(task);
+        if (filter === 'done') return task.completed;
+        return true;
+    });
+
+    const tasksToRender = filter === 'all'
+        ? groupTasksByMonth(visibleTasks)
+        : [{ monthLabel: '', tasks: visibleTasks }];
+
+    tasksToRender.forEach(function(group) {
+        if (group.monthLabel) {
+            const monthHeading = document.createElement('li');
+            monthHeading.className = 'month-heading';
+            monthHeading.textContent = `${group.monthLabel} (${group.tasks.length})`;
+            list.appendChild(monthHeading);
+        }
+
+        group.tasks.forEach(function(task) {
+            const listItem = document.createElement('li');
+            const taskText = document.createElement('span');
+            const priorityDot = document.createElement('span');
+            const taskDetails = document.createElement('span');
+            const actionContainer = document.createElement('div');
+            actionContainer.className = 'action-buttons';
+
+            listItem.classList.toggle('is-complete', task.completed);
+
+            priorityDot.className = `status-dot priority-${String(task.priority || 'medium').toLowerCase()}`;
+            priorityDot.setAttribute('aria-label', `${task.priority || 'Medium'} priority`);
+            priorityDot.title = `${task.priority || 'Medium'} priority`;
+
+            taskDetails.className = 'task-details';
+            taskText.className = 'task-title';
+            taskText.textContent = `${task.text} | Due: ${task.dueDate || 'No date'}`;
+
+            if (isOverdue(task)) {
+                const overdueBadge = document.createElement('span');
+                overdueBadge.className = 'overdue-badge';
+                overdueBadge.textContent = 'Overdue';
+                taskDetails.appendChild(overdueBadge);
+            }
+
+            taskText.title = 'Double-click to edit this task';
+
+            // Double click inline edit capability
+            taskText.addEventListener('dblclick', function() {
+                const editInput = document.createElement('input');
+                editInput.type = 'text';
+                editInput.value = task.text;
+                editInput.className = 'edit-input';
+
+                taskDetails.replaceChild(editInput, taskText);
+                editInput.focus();
+                editInput.select();
+
+                function saveEdit() {
+                    const newText = editInput.value.trim();
+                    if (newText !== '') {
+                        task.text = newText;
+                        saveTasks();
+                    }
+                    showTasks(filter);
+                }
+
+                editInput.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') saveEdit();
+                    if (event.key === 'Escape') {
+                        editInput.removeEventListener('blur', saveEdit);
+                        showTasks(filter);
+                    }
+                });
+
+                editInput.addEventListener('blur', saveEdit);
+            });
+
+            taskDetails.appendChild(taskText);
+
+            if (task.completed) {
+                const doneDot = document.createElement('span');
+                doneDot.className = 'status-dot done-dot';
+                doneDot.setAttribute('aria-label', 'Completed');
+                doneDot.title = 'Completed';
+                listItem.appendChild(doneDot);
+            }
+
+            // Mark completed button
+            const doneButton = document.createElement('button');
+            doneButton.textContent = task.completed ? 'Mark as active' : 'Mark as done';
+            doneButton.className = 'done-button';
+            doneButton.addEventListener('click', function() {
+                task.completed = !task.completed;
+                task.completedAt = task.completed ? new Date().toISOString() : null;
+                saveTasks();
+                showTasks(filter);
+            });
+
+            // Delete task button
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Delete';
+            deleteButton.className = 'delete-button';
+            deleteButton.setAttribute('aria-label', `Delete task ${task.text}`);
+            deleteButton.addEventListener('click', function() {
+                tasks = tasks.filter(t => t !== task);
+                saveTasks();
+                showTasks(filter);
+            });
+
+            actionContainer.appendChild(doneButton);
+            actionContainer.appendChild(deleteButton);
+
+            listItem.appendChild(priorityDot);
+            listItem.appendChild(taskDetails);
+            listItem.appendChild(actionContainer);
+
+            list.appendChild(listItem);
+        });
+    });
+
+    if (historyMode) {
+        drawPriorityChart();
+        drawWeeklyChart();
+    }
+}
+
+/**
+ * Groups tasks by year and month.
+ */
+function groupTasksByMonth(taskList) {
+    const groups = new Map();
+
+    taskList.forEach(function(task) {
+        const taskDate = task.dueDate ? new Date(`${task.dueDate}T12:00:00`) : null;
+        const monthLabel = taskDate
+            ? taskDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+            : 'No due date';
+        const sortKey = task.dueDate ? task.dueDate.slice(0, 7) : '9999-99';
+
+        if (!groups.has(sortKey)) {
+            groups.set(sortKey, { monthLabel: monthLabel, tasks: [] });
+        }
+
+        groups.get(sortKey).tasks.push(task);
+    });
+
+    return Array.from(groups.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(entry => entry[1]);
+}
+
+// Event Listeners
+form.addEventListener('submit', function(event) {
+    event.preventDefault();
+    const taskText = input.value.trim();
+
+    if (taskText === '') return;
+
+    const task = {
+        text: taskText,
+        dueDate: dateInput.value || getTodayDate(),
+        priority: priorityInput.value,
+        completed: false,
+        completedAt: null
+    };
+
+    tasks.push(task);
+    saveTasks();
+    showTasks(historyMode ? currentFilter : 'active');
+
+    input.value = '';
+});
+
+filters.addEventListener('click', function(event) {
+    if (event.target.tagName !== 'BUTTON') return;
+    showTasks(event.target.dataset.filter);
+});
+
+historyButton.addEventListener('click', function() {
+    historyMode = !historyMode;
+    historyButton.textContent = historyMode ? 'Back to tasks' : 'History';
+    historyButton.setAttribute('aria-pressed', String(historyMode));
+    filters.hidden = !historyMode;
+    chartsSection.hidden = !historyMode;
+    showTasks(historyMode ? currentFilter : 'active');
+});
+
+previousMonthButton.addEventListener('click', function() {
+    chartMonth.setMonth(chartMonth.getMonth() - 1);
+    drawWeeklyChart();
+});
+
+nextMonthButton.addEventListener('click', function() {
+    const currentMonth = new Date();
+    if (chartMonth.getFullYear() === currentMonth.getFullYear() && chartMonth.getMonth() === currentMonth.getMonth()) return;
+    chartMonth.setMonth(chartMonth.getMonth() + 1);
+    drawWeeklyChart();
+});
+
+// Charting Functions
+function drawWeeklyChart() {
+    if (weeklyChart) weeklyChart.destroy();
+
+    const year = chartMonth.getFullYear();
+    const month = chartMonth.getMonth();
+    const monthName = chartMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const currentMonth = new Date();
+    nextMonthButton.disabled = year === currentMonth.getFullYear() && month === currentMonth.getMonth();
+    const weeks = [0, 0, 0, 0, 0];
+
+    tasks.forEach(task => {
+        if (!task.completed || !task.completedAt) return;
+        const completedDate = new Date(task.completedAt);
+        if (completedDate.getFullYear() === year && completedDate.getMonth() === month) {
+            const weekIndex = Math.floor((completedDate.getDate() - 1) / 7);
+            if (weekIndex < 5) weeks[weekIndex]++;
+        }
+    });
+
+    weeklyChart = new Chart(weeklyChartCanvas, {
+        type: 'bar',
+        data: {
+            labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'],
+            datasets: [{
+                label: `Tasks completed - ${monthName}`,
+                data: weeks,
+                backgroundColor: '#a293ff'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+}
+
+function drawPriorityChart() {
+    if (priorityChart) priorityChart.destroy();
+
+    const high = tasks.filter(task => task.priority === 'high').length;
+    const medium = tasks.filter(task => task.priority === 'medium').length;
+    const low = tasks.filter(task => task.priority === 'low').length;
+
+    priorityChart = new Chart(priorityChartCanvas, {
+        type: 'pie',
+        data: {
+            labels: ['High', 'Medium', 'Low'],
+            datasets: [{
+                data: [high, medium, low],
+                backgroundColor: ['#ff4d5e', '#ffd447', '#ff963d']
+            }]
+        },
+        options: {
+            responsive: true
+        }
+    });
+}
+
+// Initial render
+showTasks();
