@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/qwerty274/taskmanager-nsoc2)
 [![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat&logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
 [![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat&logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
 [![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=flat&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
@@ -47,6 +48,7 @@ taskmanager/
 ├── index.html                # Main application structure & container
 ├── style.css                 # Custom design system, layout, and theme styles
 ├── script.js                # Core app logic, state management, and Chart.js integration
+├── netlify.toml              # Netlify deployment configuration & security headers
 ├── README.md                 # Project documentation & overview
 ├── CONTRIBUTING.md           # Guidelines for open-source contributors
 ├── CODE_OF_CONDUCT.md        # Community behavior standards
