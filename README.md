@@ -206,6 +206,13 @@ npx serve .
 ```
 Navigate to `http://localhost:8080` in your web browser.
 
+### 📅 Overdue Date Regression Checks
+
+1. **Yesterday's due date:** Add an active task due yesterday. Confirm that it receives an **Overdue** badge and appears under the **Overdue** history filter.
+2. **Today's due date:** Add an active task due today. Confirm that it does not receive an **Overdue** badge.
+3. **No due date:** Using browser developer tools, set a stored task's `dueDate` to an empty string and reload. Confirm that it never receives an **Overdue** badge.
+4. **Date change while open:** Keep a task due today open past local midnight, or temporarily advance the system date by one day. Return to the tab and confirm that the badge appears within 60 seconds without reloading the page.
+
 ---
 
 ## 🗺️ Roadmap
