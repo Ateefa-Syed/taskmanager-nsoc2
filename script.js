@@ -22,6 +22,7 @@ let weeklyChart = null;
 let chartMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let historyMode = false;
 let currentFilter = 'active';
+let lastRenderDate = getTodayDate();
 
 /**
  * Persists current task list to browser localStorage.
@@ -42,7 +43,8 @@ function getTodayDate() {
 }
 
 /**
- * Checks if an active task is overdue.
+ * Checks if an active task is overdue using local calendar-day boundaries.
+ * Tasks due today or without a due date are not overdue.
  */
 function isOverdue(task) {
     return Boolean(task.dueDate && task.dueDate < getTodayDate() && !task.completed);
@@ -65,6 +67,7 @@ function updateActiveFilterUI(selectedFilter) {
  * Renders task list based on active mode and filter.
  */
 function showTasks(filter = historyMode ? currentFilter : 'active') {
+    lastRenderDate = getTodayDate();
     currentFilter = filter;
     updateActiveFilterUI(filter);
     list.innerHTML = '';
@@ -220,6 +223,14 @@ function groupTasksByMonth(taskList) {
         .map(entry => entry[1]);
 }
 
+/**
+ * Re-renders tasks when the local calendar day changes while the page is open.
+ */
+function refreshTasksAfterDateChange() {
+    if (getTodayDate() === lastRenderDate) return;
+    showTasks(historyMode ? currentFilter : 'active');
+}
+
 // Event Listeners
 form.addEventListener('submit', function(event) {
     event.preventDefault();
@@ -331,6 +342,11 @@ function drawPriorityChart() {
         }
     });
 }
+
+window.setInterval(refreshTasksAfterDateChange, 60 * 1000);
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) refreshTasksAfterDateChange();
+});
 
 // Initial render
 showTasks();
